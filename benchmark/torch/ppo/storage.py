@@ -31,18 +31,26 @@ class RolloutStorage():
         self.act_space = act_space
 
         self.cur_step = 0
+        self.gae_value_cal_begin_step = self.cur_step
+        self.gae_value_to_update_times = 0
 
-    def append(self, obs, action, logprob, reward, done, value):
+    def append(self, obs, action, logprob, reward, done):
         self.obs[self.cur_step] = obs
         self.actions[self.cur_step] = action
         self.logprobs[self.cur_step] = logprob
         self.rewards[self.cur_step] = reward
         self.dones[self.cur_step] = done
-        self.values[self.cur_step] = value
 
         self.cur_step = (self.cur_step + 1) % self.step_nums
+        self.gae_value_to_update_times += 1
 
-    def compute_returns(self, value, done, gamma=0.99, gae_lambda=0.95):
+    def compute_returns(self, value, done, gamma=0.99, gae_lambda=0.95, agent=None):
+        for i in range(self.gae_value_to_update_times):
+            self.values[self.gae_value_cal_begin_step] = agent.value(self.obs[self.gae_value_cal_begin_step]).flatten()
+            self.gae_value_cal_begin_step = (self.gae_value_cal_begin_step + 1) % self.step_nums
+        self.gae_value_to_update_times = 0
+
+
         # gamma: discounting factor
         # gae_lambda: Lambda parameter for calculating N-step advantage
         advantages = np.zeros_like(self.rewards)

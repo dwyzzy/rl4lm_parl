@@ -90,9 +90,9 @@ def main():
         for step in range(0, config['step_nums']):
             total_steps += 1 * config['env_num']
 
-            value, action, logprob, _ = agent.sample(obs)
+            action, logprob, _ = agent.sample(obs)
             next_obs, reward, next_done, info = envs.step(action)
-            rollout.append(obs, action, logprob, reward, done, value.flatten())
+            rollout.append(obs, action, logprob, reward, done)
             obs, done = next_obs, next_done
 
             for k in range(config['env_num']):
@@ -105,7 +105,7 @@ def main():
 
         # Bootstrap value if not done
         value = agent.value(obs)
-        rollout.compute_returns(value, done)
+        rollout.compute_returns(value, done, agent=agent)
 
         # Optimizing the policy and value network
         v_loss, pg_loss, entropy_loss, lr = agent.learn(rollout)

@@ -37,13 +37,12 @@ class PPOAgent(parl.Agent):
 
     def sample(self, obs):
         obs = torch.FloatTensor(obs).to(self.device)
-        value, action, action_log_probs, action_entropy = self.alg.sample(obs)
+        action, action_log_probs, action_entropy = self.alg.sample(obs, postprocess_gae_value=True)
 
-        value_numpy = value.cpu().detach().numpy()
         action_numpy = action.cpu().detach().numpy()
         action_log_probs_numpy = action_log_probs.cpu().detach().numpy()
         action_entropy_numpy = action_entropy.cpu().detach().numpy()
-        return value_numpy, action_numpy, action_log_probs_numpy, action_entropy_numpy
+        return action_numpy, action_log_probs_numpy, action_entropy_numpy
 
     def value(self, obs):
         obs = torch.FloatTensor(obs).to(self.device)
