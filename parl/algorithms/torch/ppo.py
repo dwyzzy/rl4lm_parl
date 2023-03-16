@@ -148,19 +148,19 @@ class PPO(parl.Algorithm):
 
         return value_loss.item(), action_loss.item(), entropy_loss.item()
 
-    def sample(self, obs, postprocess_gae_value=False):
+    def sample(self, obs, return_value=True):
         """ Define the sampling process. This function returns the action according to action distribution.
 
         Args:
             obs (torch tensor): observation, shape([batch_size] + obs_shape)
-            postprocess_gae_value (bool): whether to process value for gae after collecting all transitions
+            return_value (bool): whether to return value, True will return.
         Returns:
             value (torch tensor): value, shape([batch_size, 1])
             action (torch tensor): action, shape([batch_size] + action_shape)
             action_log_probs (torch tensor): action log probs, shape([batch_size])
             action_entropy (torch tensor): action entropy, shape([batch_size])
         """
-        if not postprocess_gae_value:
+        if return_value:
             value = self.model.value(obs)
 
         if self.continuous_action:
@@ -178,7 +178,7 @@ class PPO(parl.Algorithm):
             action_log_probs = dist.log_prob(action)
             action_entropy = dist.entropy()
 
-        if not postprocess_gae_value:
+        if return_value:
             return value, action, action_log_probs, action_entropy
         return action, action_log_probs, action_entropy
 
