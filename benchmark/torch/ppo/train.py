@@ -78,8 +78,13 @@ def main():
         continuous_action=config['continuous_action'])
     agent = PPOAgent(ppo, config)
 
+    # decide whether to process value for gae after collecting all transition
+    # True: process value during collect each step
+    # False: process value after collect all transition
+    postprocess_gae_value = True
+
     rollout = RolloutStorage(config['step_nums'], config['env_num'], obs_space,
-                             act_space)
+                             act_space, postprocess_gae_value=postprocess_gae_value)
 
     obs = envs.reset()
     done = np.zeros(config['env_num'], dtype='float32')
@@ -90,9 +95,17 @@ def main():
         for step in range(0, config['step_nums']):
             total_steps += 1 * config['env_num']
 
-            value, action, logprob, _ = agent.sample(obs)
+            if postprocess_gae_value:
+                action, logprob, _ = agent.sample(obs, postprocess_gae_value=postprocess_gae_value)
+            else:
+                value, action, logprob, _ = agent.sample(obs, postprocess_gae_value=postprocess_gae_value)
+
             next_obs, reward, next_done, info = envs.step(action)
-            rollout.append(obs, action, logprob, reward, done, value.flatten())
+
+            if postprocess_gae_value:
+                rollout.append(obs, action, logprob, reward, done, None)
+            else:
+                rollout.append(obs, action, logprob, reward, done, value.flatten())
             obs, done = next_obs, next_done
 
             for k in range(config['env_num']):
@@ -105,7 +118,10 @@ def main():
 
         # Bootstrap value if not done
         value = agent.value(obs)
-        rollout.compute_returns(value, done)
+        if postprocess_gae_value:
+            rollout.compute_returns(value, done, agent=agent)
+        else:
+            rollout.compute_returns(value, done, agent=None)
 
         # Optimizing the policy and value network
         v_loss, pg_loss, entropy_loss, lr = agent.learn(rollout)

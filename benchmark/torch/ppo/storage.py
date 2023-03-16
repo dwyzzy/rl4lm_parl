@@ -16,7 +16,7 @@ import numpy as np
 
 
 class RolloutStorage():
-    def __init__(self, step_nums, env_num, obs_space, act_space):
+    def __init__(self, step_nums, env_num, obs_space, act_space, postprocess_gae_value=False):
         self.obs = np.zeros(
             (step_nums, env_num) + obs_space.shape, dtype='float32')
         self.actions = np.zeros(
@@ -30,7 +30,13 @@ class RolloutStorage():
         self.obs_space = obs_space
         self.act_space = act_space
 
+        # process value for gae after collect all transition
+        self.postprocess_gae_value = postprocess_gae_value
+
         self.cur_step = 0
+        self.gae_value_cal_begin_step = self.cur_step
+        self.all_need_adv_compute = False
+
 
     def append(self, obs, action, logprob, reward, done, value):
         self.obs[self.cur_step] = obs
@@ -38,11 +44,26 @@ class RolloutStorage():
         self.logprobs[self.cur_step] = logprob
         self.rewards[self.cur_step] = reward
         self.dones[self.cur_step] = done
-        self.values[self.cur_step] = value
+        if value is not None:
+            self.values[self.cur_step] = value
+        if self.postprocess_gae_value:
+            if (self.cur_step + 1) % self.step_nums == self.gae_value_cal_begin_step:
+                self.all_need_adv_compute = True
 
         self.cur_step = (self.cur_step + 1) % self.step_nums
 
-    def compute_returns(self, value, done, gamma=0.99, gae_lambda=0.95):
+    def compute_returns(self, value, done, gamma=0.99, gae_lambda=0.95, agent=None):
+        if self.postprocess_gae_value:
+            if self.all_need_adv_compute:
+                for i in range(len(self.obs)):
+                    self.values[i] = agent.value(self.obs[i]).flatten()
+                self.gae_value_cal_begin_step = self.cur_step
+            else:
+                while self.gae_value_cal_begin_step != self.cur_step:
+                    self.values[self.gae_value_cal_begin_step] = agent.value(self.obs[self.gae_value_cal_begin_step]).flatten()
+                    self.gae_value_cal_begin_step = (self.gae_value_cal_begin_step + 1) % self.step_nums
+            self.all_need_adv_compute = False
+
         # gamma: discounting factor
         # gae_lambda: Lambda parameter for calculating N-step advantage
         advantages = np.zeros_like(self.rewards)
