@@ -35,7 +35,7 @@ class RolloutStorage():
 
         self.cur_step = 0
         self.gae_value_cal_begin_step = self.cur_step
-        self.all_need_adv_compute = False
+        self.all_need_value_compute = False
 
 
     def append(self, obs, action, logprob, reward, done, value):
@@ -48,13 +48,13 @@ class RolloutStorage():
             self.values[self.cur_step] = value
         if self.postprocess_gae_value:
             if (self.cur_step + 1) % self.step_nums == self.gae_value_cal_begin_step:
-                self.all_need_adv_compute = True
+                self.all_need_value_compute = True
 
         self.cur_step = (self.cur_step + 1) % self.step_nums
 
     def compute_returns(self, value, done, gamma=0.99, gae_lambda=0.95, agent=None):
         if self.postprocess_gae_value:
-            if self.all_need_adv_compute:
+            if self.all_need_value_compute:
                 for i in range(len(self.obs)):
                     self.values[i] = agent.value(self.obs[i]).flatten()
                 self.gae_value_cal_begin_step = self.cur_step
@@ -62,7 +62,7 @@ class RolloutStorage():
                 while self.gae_value_cal_begin_step != self.cur_step:
                     self.values[self.gae_value_cal_begin_step] = agent.value(self.obs[self.gae_value_cal_begin_step]).flatten()
                     self.gae_value_cal_begin_step = (self.gae_value_cal_begin_step + 1) % self.step_nums
-            self.all_need_adv_compute = False
+            self.all_need_value_compute = False
 
         # gamma: discounting factor
         # gae_lambda: Lambda parameter for calculating N-step advantage
